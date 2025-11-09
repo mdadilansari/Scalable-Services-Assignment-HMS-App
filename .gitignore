@@ -1,0 +1,33 @@
+# Node.js dependencies
+node_modules/
+
+# dotenv environment files
+.env
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# PostgreSQL dump files (if any)
+*.sql
+
+# VSCode workspace settings (optional)
+.vscode/
+
+# Docker artifacts, if you have any builds
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports (if using test tools)
+coverage/
+
+# Miscellaneous
+*.swp
