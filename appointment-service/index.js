@@ -120,6 +120,51 @@ app.delete('/appointments/:id', async (req, res) => {
   }
 });
 
+app.post('/appointments/:id/reschedule', async (req, res) => {
+  const { id } = req.params;
+  const { newSlotStart, newSlotEnd } = req.body;
+
+  try {
+    // Fetch appointment
+    const result = await pool.query('SELECT * FROM appointments WHERE appointment_id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    const appointment = result.rows[0];
+
+    // Rule 1: Max 2 reschedules
+    if ((appointment.reschedule_count || 0) >= 2) {
+      return res.status(400).json({ error: 'Max reschedules reached' });
+    }
+
+    // Rule 2: Cut-off within 1 hour of slot start
+    const now = new Date();
+    const slotStart = new Date(appointment.slot_start);
+    console.log(slotStart);
+    console.log(appointment.slot_start);
+    
+    
+    if ((slotStart - now) < 60 * 60 * 1000) {
+      return res.status(400).json({ error: 'Cannot reschedule within 1 hour of slot start' });
+    }
+
+    // Check doctor availability and department (as before)
+    // ...doctor service call...
+
+    // Update appointment: new slot, increment reschedule_count
+    const update = await pool.query(
+      `UPDATE appointments
+       SET slot_start = $1, slot_end = $2, reschedule_count = COALESCE(reschedule_count, 0) + 1, status = 'SCHEDULED'
+       WHERE appointment_id = $3
+       RETURNING *`,
+      [newSlotStart, newSlotEnd, id]
+    );
+    res.json(update.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not reschedule appointment' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Appointment Service running on port ${PORT}`);
