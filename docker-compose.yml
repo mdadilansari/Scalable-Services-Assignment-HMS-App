@@ -1,27 +1,148 @@
 # docker-compose.yml for HMS Assignment
 version: '3.8'
 services:
+  appointment-service:
+    build: ./appointment-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PGHOST=appointment-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_appointments
+      - PGPORT=5432
+    depends_on:
+      - appointment-db
+  appointment-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_appointments
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5431:5432"
+    volumes:
+      - appointment-db-data:/var/lib/postgresql/data
+
+  billing-service:
+    build: ./billing-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PGHOST=billing-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_billing
+      - PGPORT=5432
+    depends_on:
+      - billing-db
+  billing-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_billing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - billing-db-data:/var/lib/postgresql/data
+
   doctor-service:
     build: ./doctor-service
     ports:
-      - "8001:8001"
+      - "3003:3003"
+    environment:
+      - PGHOST=doctor-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_doctors
+      - PGPORT=5432
+    depends_on:
+      - doctor-db
+  doctor-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_doctors
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - doctor-db-data:/var/lib/postgresql/data
+
   patient-service:
-    build: ./doctor-service/patient-service
+    build: ./patient-service
     ports:
-      - "8002:8002"
-  appointment-service:
-    build: ./doctor-service/appointment-service
+      - "3004:3004"
+    environment:
+      - PGHOST=patient-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_patients
+      - PGPORT=5432
+    depends_on:
+      - patient-db
+  patient-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_patients
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "8003:8003"
-  prescription-service:
-    build: ./doctor-service/prescription-service
-    ports:
-      - "8004:8004"
-  billing-service:
-    build: ./doctor-service/billing-service
-    ports:
-      - "8005:8005"
+      - "5434:5432"
+    volumes:
+      - patient-db-data:/var/lib/postgresql/data
+
   payment-service:
-    build: ./doctor-service/payment-service
+    build: ./payment-service
     ports:
-      - "8006:8006"
+      - "3005:3005"
+    environment:
+      - PGHOST=payment-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_payments
+      - PGPORT=5432
+    depends_on:
+      - payment-db
+  payment-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_payments
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+
+  prescription-service:
+    build: ./prescription-service
+    ports:
+      - "3006:3006"
+    environment:
+      - PGHOST=prescription-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=hms_prescriptions
+      - PGPORT=5432
+    depends_on:
+      - prescription-db
+  prescription-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hms_prescriptions
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - prescription-db-data:/var/lib/postgresql/data
+
+volumes:
+  appointment-db-data:
+  billing-db-data:
+  doctor-db-data:
+  patient-db-data:
+  payment-db-data:
+  prescription-db-data:
