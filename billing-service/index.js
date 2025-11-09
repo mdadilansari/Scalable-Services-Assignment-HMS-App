@@ -83,6 +83,22 @@ app.delete('/bills/:id', async (req, res) => {
   }
 });
 
+app.get('/bills/by-appointment/:appointmentId', async (req, res) => {
+  const { appointmentId } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM bills WHERE appointment_id = $1',
+      [appointmentId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Bill not found for this appointment' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Billing Service running on port ${PORT}`);

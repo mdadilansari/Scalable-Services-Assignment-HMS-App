@@ -165,6 +165,66 @@ app.post('/appointments/:id/reschedule', async (req, res) => {
   }
 });
 
+app.post('/appointments/:id/cancel', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Fetch appointment
+    const result = await pool.query('SELECT * FROM appointments WHERE appointment_id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    const appointment = result.rows[0];
+
+    // Check cancellation policy
+    const now = new Date();
+    const slotStart = new Date(appointment.slot_start);
+    let refundType = 'full';
+    let cancellationFee = 0;
+
+    // Fetch bill for this appointment
+    const billResp = await axios.get(`http://localhost:3002/bills?appointment_id=${id}`);
+    const bill = billResp.data && billResp.data.length > 0 ? billResp.data[0] : null;
+
+    if (!bill) {
+      return res.status(404).json({ error: 'Associated bill not found' });
+    }
+
+    // Policy logic
+    if ((slotStart - now) <= 2 * 60 * 60 * 1000) {
+      refundType = 'partial';
+      cancellationFee = bill.amount * 0.5; // 50% fee
+      // Update bill with cancellation fee
+      await axios.put(`http://localhost:3002/bills/${bill.bill_id}`, {
+        ...bill,
+        amount: cancellationFee,
+        status: 'CANCELLED'
+      });
+    } else {
+      // Full refund: mark bill as VOID
+      await axios.put(`http://localhost:3002/bills/${bill.bill_id}`, {
+        ...bill,
+        status: 'VOID'
+      });
+    }
+
+    // Set appointment status to CANCELLED
+    await pool.query(
+      `UPDATE appointments SET status = 'CANCELLED' WHERE appointment_id = $1`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      appointment_id: id,
+      refundType,
+      cancellationFee
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not cancel appointment' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Appointment Service running on port ${PORT}`);
