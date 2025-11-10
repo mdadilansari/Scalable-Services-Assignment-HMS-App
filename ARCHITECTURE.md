@@ -1,7 +1,61 @@
 # HMS Microservices Architecture
 
 ## Overview
-This application is a scalable Hospital Management System (HMS) built using a microservices architecture. Each core domain (appointments, billing, doctors, patients, payments, prescriptions) is implemented as a separate service, with its own database. The system is containerized using Docker and can be orchestrated with Docker Compose or Kubernetes (Minikube).
+A scalable Hospital Management System (HMS) built with Node.js microservices, PostgreSQL databases, Docker containerization, and Kubernetes orchestration. Features include patient management, doctor scheduling, appointment booking, billing, prescriptions, notifications, and robust business rules for healthcare workflows.
+
+---
+
+## Architecture Diagram
+```mermaid
+graph TD
+    PatientService[Patient Service]
+    DoctorService[Doctor Service]
+    AppointmentService[Appointment Service]
+    BillingService[Billing Service]
+    PrescriptionService[Prescription Service]
+    NotificationService[Notification Service]
+    PatientDB[(Patient DB)]
+    DoctorDB[(Doctor DB)]
+    AppointmentDB[(Appointment DB)]
+    BillingDB[(Billing DB)]
+    PrescriptionDB[(Prescription DB)]
+    NotificationDB[(Notification DB)]
+
+    PatientService -- REST --> PatientDB
+    DoctorService -- REST --> DoctorDB
+    AppointmentService -- REST --> AppointmentDB
+    BillingService -- REST --> BillingDB
+    PrescriptionService -- REST --> PrescriptionDB
+    NotificationService -- REST --> NotificationDB
+    AppointmentService -- REST --> PatientService
+    AppointmentService -- REST --> DoctorService
+    AppointmentService -- REST --> BillingService
+    BillingService -- REST --> PaymentService
+```
+
+---
+
+## Service Descriptions
+
+- **Patient Service:** Manages patient records, registration, and updates. Owns patient data and exposes endpoints for CRUD operations.
+- **Doctor Service:** Handles doctor profiles, schedules, and availability. Owns doctor data and provides endpoints for profile and schedule management.
+- **Appointment Service:** Orchestrates booking, rescheduling, cancellation, and completion of appointments. Coordinates with patient, doctor, and billing services.
+- **Billing Service:** Generates bills, applies refund rules, and tracks payment status. Owns billing data and interacts with appointment and payment services.
+- **Prescription Service:** Manages prescriptions issued by doctors for patients. Owns prescription data and provides endpoints for prescription management.
+- **Notification Service:** Sends alerts and reminders to patients and doctors. Integrates with other services to trigger notifications.
+
+---
+
+## API Endpoints
+
+| Service      | Endpoint                  | Method | Request Sample | Response Sample |
+|--------------|---------------------------|--------|---------------|----------------|
+| Patient      | /patients                 | POST   | `{ "name": "John Doe", "dob": "1990-01-01" }` | `{ "id": 1, "name": "John Doe" }` |
+| Doctor       | /doctors                  | GET    |               | `[ { "id": 1, "name": "Dr. Smith" } ]` |
+| Appointment  | /appointments             | POST   | `{ "patientId": 1, "doctorId": 2, "slot": "2025-11-12T10:00" }` | `{ "id": 10, "status": "BOOKED" }` |
+| Billing      | /bills                    | GET    |               | `[ { "id": 5, "amount": 500 } ]` |
+| Prescription | /prescriptions            | POST   | `{ "patientId": 1, "doctorId": 2, "meds": ["Paracetamol"] }` | `{ "id": 3, "status": "ISSUED" }` |
+| Notification | /notify                   | POST   | `{ "userId": 1, "message": "Your appointment is tomorrow" }` | `{ "status": "sent" }` |
 
 ---
 
@@ -290,7 +344,9 @@ minikube service <service-name>
 
 ---
 
-## Example Sequence: Booking an Appointment
+## Inter-Service Workflows
+
+### 1. Booking an Appointment
 
 ```mermaid
 sequenceDiagram
@@ -302,8 +358,7 @@ sequenceDiagram
     participant DoctorDB
 
     Patient->>PatientService: POST /patients
-    PatientService->>PatientDB: Add patient record
-    Patient->>AppointmentService: POST /appointments
+    PatientService->>AppointmentService: POST /appointments
     AppointmentService->>AppointmentDB: Create appointment
     AppointmentService->>DoctorService: GET /doctors/:id
     DoctorService->>DoctorDB: Fetch doctor details
@@ -312,5 +367,113 @@ sequenceDiagram
 
 ---
 
-## Summary
-This HMS application is designed for modularity, scalability, and maintainability. Each domain is isolated, making it easy to develop, test, and deploy new features or services. The architecture supports both local development (Docker Compose) and cloud-native orchestration (Kubernetes/Minikube).
+### 2. Reschedule Appointment
+- **Endpoint:** `PUT /appointments/:id/reschedule`
+- **Rules:**
+  - Max 2 reschedules per appointment.
+  - Cannot reschedule within 1 hour of slot start.
+- **Statuses:**
+  - `RESCHEDULED` (with reschedule count)
+  - `RESCHEDULE_LIMIT_EXCEEDED` (if >2)
+  - `RESCHEDULE_CUTOFF_EXCEEDED` (if <1h)
+
+```mermaid
+sequenceDiagram
+    participant Patient
+    participant AppointmentService
+    participant AppointmentDB
+
+    Patient->>AppointmentService: PUT /appointments/:id/reschedule
+    AppointmentService->>AppointmentDB: Check reschedule count & slot time
+    alt Allowed
+        AppointmentService->>AppointmentDB: Update appointment slot & status
+    else Not Allowed
+        AppointmentService->>Patient: Error (limit/cutoff)
+    end
+```
+
+---
+
+### 3. Cancel Appointment
+- **Endpoint:** `DELETE /appointments/:id/cancel`
+- **Rules:**
+  - Cancel > 2h before start → full refund.
+  - Cancel ≤ 2h → 50% fee (document amount or rule).
+  - No-show → 100% consultation fee charged or flagged.
+- **Statuses:**
+  - `CANCELLED_FULL_REFUND`
+  - `CANCELLED_PARTIAL_REFUND`
+  - `NO_SHOW`
+
+```mermaid
+sequenceDiagram
+    participant Patient
+    participant AppointmentService
+    participant BillingService
+    participant AppointmentDB
+    participant BillingDB
+
+    Patient->>AppointmentService: DELETE /appointments/:id/cancel
+    AppointmentService->>AppointmentDB: Check time to slot
+    alt >2h before
+        AppointmentService->>BillingService: Issue full refund
+        BillingService->>BillingDB: Update bill
+    else ≤2h before
+        AppointmentService->>BillingService: Issue partial refund (50%)
+        BillingService->>BillingDB: Update bill
+    end
+    AppointmentService->>AppointmentDB: Update status
+```
+
+---
+
+### 4. No-Show Handling
+- **Endpoint:** `PUT /appointments/:id/no-show` (system/desk action)
+- **Process:**
+  - Reception marks appointment NO_SHOW after grace period (e.g., 15 minutes).
+  - Appointment → Billing: create/adjust bill per no-show fee policy.
+- **Status:**
+  - `NO_SHOW`
+
+```mermaid
+sequenceDiagram
+    participant Reception
+    participant AppointmentService
+    participant BillingService
+    participant AppointmentDB
+    participant BillingDB
+
+    Reception->>AppointmentService: PUT /appointments/:id/no-show
+    AppointmentService->>AppointmentDB: Update status to NO_SHOW
+    AppointmentService->>BillingService: Create/adjust bill for no-show fee
+    BillingService->>BillingDB: Update bill
+```
+
+---
+
+### 5. Complete Appointment → Bill & Pay
+- **Endpoint:** `PUT /appointments/:id/complete`
+- **Process:**
+  - Appointment status → COMPLETED
+  - Appointment → Billing Service to create bill (consultation + meds + 5% tax).
+- **Status:**
+  - `COMPLETED`
+
+```mermaid
+sequenceDiagram
+    participant Doctor
+    participant AppointmentService
+    participant BillingService
+    participant PaymentService
+    participant AppointmentDB
+    participant BillingDB
+    participant PaymentDB
+
+    Doctor->>AppointmentService: PUT /appointments/:id/complete
+    AppointmentService->>AppointmentDB: Update status to COMPLETED
+    AppointmentService->>BillingService: Create bill (consultation + meds + tax)
+    BillingService->>BillingDB: Store bill
+    Patient->>PaymentService: POST /payments
+    PaymentService->>PaymentDB: Record payment
+    PaymentService->>BillingService: Update bill status
+```
