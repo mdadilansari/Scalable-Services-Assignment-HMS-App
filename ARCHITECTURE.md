@@ -1,7 +1,7 @@
 # HMS Microservices Architecture
 
 ## Overview
-A scalable Hospital Management System (HMS) built with Node.js microservices, PostgreSQL databases, Docker containerization, and Kubernetes orchestration. Features include patient management, doctor scheduling, appointment booking, billing, prescriptions, notifications, and robust business rules for healthcare workflows.
+A scalable Hospital Management System (HMS) built with Node.js microservices, PostgreSQL databases, Docker containerization, and Kubernetes orchestration. Features include patient management, doctor scheduling, appointment booking, billing, prescriptions, and robust business rules for healthcare workflows.
 
 ---
 
@@ -13,23 +13,40 @@ graph TD
     AppointmentService[Appointment Service]
     BillingService[Billing Service]
     PrescriptionService[Prescription Service]
-    NotificationService[Notification Service]
     PatientDB[(Patient DB)]
     DoctorDB[(Doctor DB)]
     AppointmentDB[(Appointment DB)]
     BillingDB[(Billing DB)]
     PrescriptionDB[(Prescription DB)]
-    NotificationDB[(Notification DB)]
 
     PatientService -- REST --> PatientDB
     DoctorService -- REST --> DoctorDB
     AppointmentService -- REST --> AppointmentDB
     BillingService -- REST --> BillingDB
     PrescriptionService -- REST --> PrescriptionDB
-    NotificationService -- REST --> NotificationDB
     AppointmentService -- REST --> PatientService
     AppointmentService -- REST --> DoctorService
     AppointmentService -- REST --> BillingService
+    BillingService -- REST --> PaymentService
+```
+
+---
+
+## Service Communication Diagram
+
+```mermaid
+graph LR
+    AppointmentService -- REST --> AppointmentDB
+    DoctorService -- REST --> DoctorDB
+    PatientService -- REST --> PatientDB
+    BillingService -- REST --> BillingDB
+    PaymentService -- REST --> PaymentDB
+    PrescriptionService -- REST --> PrescriptionDB
+
+    AppointmentService -- REST --> DoctorService
+    AppointmentService -- REST --> PatientService
+    DoctorService -- REST --> PrescriptionService
+    PatientService -- REST --> BillingService
     BillingService -- REST --> PaymentService
 ```
 
@@ -42,7 +59,6 @@ graph TD
 - **Appointment Service:** Orchestrates booking, rescheduling, cancellation, and completion of appointments. Coordinates with patient, doctor, and billing services.
 - **Billing Service:** Generates bills, applies refund rules, and tracks payment status. Owns billing data and interacts with appointment and payment services.
 - **Prescription Service:** Manages prescriptions issued by doctors for patients. Owns prescription data and provides endpoints for prescription management.
-- **Notification Service:** Sends alerts and reminders to patients and doctors. Integrates with other services to trigger notifications.
 
 ---
 
@@ -55,7 +71,6 @@ graph TD
 | Appointment  | /appointments             | POST   | `{ "patientId": 1, "doctorId": 2, "slot": "2025-11-12T10:00" }` | `{ "id": 10, "status": "BOOKED" }` |
 | Billing      | /bills                    | GET    |               | `[ { "id": 5, "amount": 500 } ]` |
 | Prescription | /prescriptions            | POST   | `{ "patientId": 1, "doctorId": 2, "meds": ["Paracetamol"] }` | `{ "id": 3, "status": "ISSUED" }` |
-| Notification | /notify                   | POST   | `{ "userId": 1, "message": "Your appointment is tomorrow" }` | `{ "status": "sent" }` |
 
 ---
 
@@ -320,10 +335,6 @@ minikube service <service-name>
 
 ---
 
-## Service Communication Diagram
-
----
-
 ## Summary Table
 | Service      | Port  | DB Name           | Main Functions                |
 |--------------|-------|-------------------|-------------------------------|
@@ -509,7 +520,6 @@ _Note: Each service has its own DB. Read models may be replicated for reporting.
 | Appointment     | AppointmentDB    | Patient, Doctor, Billing |
 | Billing         | BillingDB        | Appointment, Payment   |
 | Prescription    | PrescriptionDB   | Doctor, Patient        |
-| Notification    | NotificationDB   | All services           |
 
 ---
 
