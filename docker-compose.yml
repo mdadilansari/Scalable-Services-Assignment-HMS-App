@@ -14,7 +14,7 @@ services:
     depends_on:
       - appointment-db
   appointment-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_appointments
       POSTGRES_USER: postgres
@@ -22,7 +22,7 @@ services:
     ports:
       - "5431:5432"
     volumes:
-      - appointment-db-data:/var/lib/postgresql/data
+      - appointment-db-data:/var/lib/postgresql
 
   billing-service:
     build: ./billing-service
@@ -37,7 +37,7 @@ services:
     depends_on:
       - billing-db
   billing-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_billing
       POSTGRES_USER: postgres
@@ -45,7 +45,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - billing-db-data:/var/lib/postgresql/data
+    - billing-db-data:/var/lib/postgresql
 
   doctor-service:
     build: ./doctor-service
@@ -60,7 +60,7 @@ services:
     depends_on:
       - doctor-db
   doctor-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_doctors
       POSTGRES_USER: postgres
@@ -68,7 +68,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - doctor-db-data:/var/lib/postgresql/data
+      - doctor-db-data:/var/lib/postgresql
 
   patient-service:
     build: ./patient-service
@@ -83,7 +83,7 @@ services:
     depends_on:
       - patient-db
   patient-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_patients
       POSTGRES_USER: postgres
@@ -91,7 +91,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - patient-db-data:/var/lib/postgresql/data
+      - patient-db-data:/var/lib/postgresql
 
   payment-service:
     build: ./payment-service
@@ -106,7 +106,7 @@ services:
     depends_on:
       - payment-db
   payment-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_payments
       POSTGRES_USER: postgres
@@ -114,7 +114,7 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - payment-db-data:/var/lib/postgresql/data
+      - payment-db-data:/var/lib/postgresql
 
   prescription-service:
     build: ./prescription-service
@@ -129,7 +129,7 @@ services:
     depends_on:
       - prescription-db
   prescription-db:
-    image: postgres:15
+    image: postgres:18
     environment:
       POSTGRES_DB: hms_prescriptions
       POSTGRES_USER: postgres
@@ -137,7 +137,7 @@ services:
     ports:
       - "5436:5432"
     volumes:
-      - prescription-db-data:/var/lib/postgresql/data
+      - prescription-db-data:/var/lib/postgresql
 
 volumes:
   appointment-db-data:
