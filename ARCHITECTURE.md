@@ -477,3 +477,147 @@ sequenceDiagram
     PaymentService->>PaymentDB: Record payment
     PaymentService->>BillingService: Update bill status
 ```
+
+---
+
+## Database-Per-Service
+
+### Example ER Diagram (Appointment Service)
+```mermaid
+erDiagram
+    APPOINTMENT {
+        int id
+        int patient_id
+        int doctor_id
+        datetime slot
+        string status
+        int reschedule_count
+    }
+    PATIENT ||--o{ APPOINTMENT : books
+    DOCTOR ||--o{ APPOINTMENT : attends
+```
+_Note: Each service has its own DB. Read models may be replicated for reporting._
+
+---
+
+## Context Map
+
+| Service         | Owns Data         | Consumes Data From      |
+|-----------------|------------------|------------------------|
+| Patient         | PatientDB        | Appointment, Billing   |
+| Doctor          | DoctorDB         | Appointment, Prescription |
+| Appointment     | AppointmentDB    | Patient, Doctor, Billing |
+| Billing         | BillingDB        | Appointment, Payment   |
+| Prescription    | PrescriptionDB   | Doctor, Patient        |
+| Notification    | NotificationDB   | All services           |
+
+---
+
+## Inter-service Workflows
+
+### Booking
+1. Patient requests appointment.
+2. Appointment Service checks doctor availability.
+3. Appointment created, status = BOOKED.
+
+### Rescheduling
+- Max 2 reschedules, not allowed <1h before slot.
+- Status changes: RESCHEDULED, LIMIT_EXCEEDED, CUTOFF_EXCEEDED.
+
+### Cancel
+- >2h: full refund, ≤2h: 50% fee, no-show: 100% fee.
+
+### No-Show
+- Reception marks NO_SHOW, triggers billing adjustment.
+
+### Completion
+- Doctor marks COMPLETED, triggers bill creation and payment.
+
+---
+
+## Business Rules
+
+- Max 2 reschedules per appointment.
+- No reschedule within 1 hour of slot.
+- Cancel >2h: full refund; ≤2h: 50% fee.
+- No-show: 100% consultation fee.
+- Bill includes consultation, meds, 5% tax.
+
+---
+
+## Containerization
+
+- Each service has a Dockerfile:
+  ```Dockerfile
+  FROM node:18
+  WORKDIR /app
+  COPY package*.json ./
+  RUN npm install
+  COPY . .
+  EXPOSE <port>
+  CMD ["node", "index.js"]
+  ```
+- `docker-compose.yml` example:
+  ```yaml
+  version: '3.8'
+  services:
+    appointment-service:
+      build: ./appointment-service
+      ports:
+        - "3001:3001"
+      environment:
+        DATABASE_URL: postgresql://postgres:postgres@appointment-db:5432/hms_appointments
+    appointment-db:
+      image: postgres:18
+      environment:
+        POSTGRES_DB: hms_appointments
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      ports:
+        - "5431:5432"
+      volumes:
+        - appointment-db-data:/var/lib/postgresql
+  volumes:
+    appointment-db-data:
+  ```
+
+---
+
+## Kubernetes Deployment
+
+- Example manifests for Deployment, Service, ConfigMap/Secret, PVC.
+- Diagram of pods and services.
+
+---
+
+## Monitoring & Logs
+
+- Metrics: Prometheus, Grafana dashboard.
+- Logs: JSON format, centralized logging.
+- Tracing: Jaeger or Zipkin.
+
+---
+
+## Testing
+
+- Unit test sample (Jest/Mocha).
+- Postman collection.
+- Sample test run output.
+
+---
+
+## Design Decisions
+
+- Microservices for scalability and isolation.
+- DB-per-service for autonomy.
+- REST for synchronous calls, messaging for async (if used).
+- Containerization for portability.
+
+---
+
+## Setup Instructions
+
+1. Clone repo.
+2. Run `docker-compose up --build`.
+3. Seed DBs with SQL files.
+4. Access Swagger UI at `/swagger` endpoint.
